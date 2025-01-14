@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Threat Research</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.0/css/bootstrap.min.css">
+    <style>
+        body { background-color: #f9f9f9; color: #333; }
+        .container { margin-top: 20px; }
+        .news-card { border: 1px solid #ddd; padding: 15px; margin-bottom: 15px; border-radius: 5px; background: #fff; }
+        .news-card:hover { background: #f1f1f1; }
+        .title { color: #d9534f; font-weight: bold; }
+        #loading-message { display: none; color: #007bff; }
+        .btn-secondary { background-color: green; border-color: green; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Vendor Threat News Feed</h1>
+        <form id="filter-form">
+            <div class="mb-3">
+                <!-- <label for="keywords" class="form-label">Keywords</label> -->
+                <div class="input-group">
+                    <input type="text" id="keyword-input" class="form-control" placeholder="Add a keyword" onkeypress="if(event.key === 'Enter') { event.preventDefault(); addKeyword(); }">
+                    <button type="button" class="btn btn-secondary" onclick="addKeyword()">Add</button>
+                </div>
+                <select id="keywords" class="form-select mt-2" multiple></select>
+                <button type="button" class="btn btn-danger mt-2" onclick="removeKeyword()">Remove Selected</button>
+            </div>
+            <div class="mb-3">
+                <label for="date-filter" class="form-label">Date Range</label>
+                <select id="date-filter" class="form-select">
+                    <option value="">All Time</option>
+                    <option value="today">Today</option>
+                    <option value="last_24_hours">Last 24 Hours</option>
+                    <option value="last_3_days">Last 3 Days</option>
+                    <option value="last_7_days">Last 7 Days</option>
+                    <option value="last_30_days">Last 30 Days</option>
+                </select>
+            </div>
+            <button type="button" class="btn btn-primary" onclick="fetchNews()">Hunt</button>
+        </form>
+        <div id="loading-message">Searching for news, please wait...</div>
+        <div id="news-container" class="mt-4"></div>
+    </div>
+    <script>
+        function addKeyword() {
+            const keywordInput = document.getElementById('keyword-input');
+            const keyword = keywordInput.value.trim();
+            if (keyword) {
+                const option = document.createElement('option');
+                option.value = keyword;
+                option.textContent = keyword;
+                option.selected = true;
+                document.getElementById('keywords').appendChild(option);
+                keywordInput.value = '';
+            }
+        }
+
+        function removeKeyword() {
+            const keywordsSelect = document.getElementById('keywords');
+            Array.from(keywordsSelect.selectedOptions).forEach(option => option.remove());
+        }
+
+        async function fetchNews() {
+            const keywords = Array.from(document.getElementById('keywords').selectedOptions).map(opt => opt.value);
+            const dateFilter = document.getElementById('date-filter').value;
+            const loadingMessage = document.getElementById('loading-message');
+            const newsContainer = document.getElementById('news-container');
+
+            if (keywords.length === 0) {
+                alert('Please add at least one keyword to search.');
+                return;
+            }
+
+            loadingMessage.style.display = 'block';
+            newsContainer.innerHTML = '';
+
+            const response = await fetch('/news', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ keywords, date_filter: dateFilter }),
+            });
+
+            const data = await response.json();
+            loadingMessage.style.display = 'none';
+
+            if (data.articles.length > 0) {
+                data.articles.forEach(article => {
+                    const card = document.createElement('div');
+                    card.classList.add('news-card');
+                    card.innerHTML = `
+                        <div><b>${article.source}</b></div>
+                        <div class="title">${article.title}</div>
+                        <div><b>${article.keywords}</b></div>
+                        <div><a href="${article.link}" target="_blank">${article.link}</a></div>
+                        <div class="text-muted">Published: ${article.published}</div>
+                    `;
+                    newsContainer.appendChild(card);
+                });
+            } else {
+                newsContainer.innerHTML = '<p>No articles found.</p>';
+            }
+        }
+    </script>
+</body>
+</html>
